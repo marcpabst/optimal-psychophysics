@@ -1,0 +1,22 @@
+[package]
+name = "optimal_psychophysics"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "optimal_psychophysics"
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1.0.86"
+arrow = "52.1.0"
+nuts-rs = "0.12.1"
+rand = "0.8.5"
+rayon = "1.10.0"
+rv = "0.17.0"
+thiserror = "1.0.63"
+pyo3 = { version = "0.21", features = ["extension-module", "abi3-py37"] }
+numpy = "0.21"
+ndarray = "0.15.6"
+rand_distr = "0.4.3"
+num-traits = "0.2.19"
