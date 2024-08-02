@@ -1,5 +1,12 @@
+pub use bernoulli_logit::BernoulliLogit;
 use num_traits::Float;
 use rand::Rng;
+
+mod bernoulli_logit;
+
+// re-export distributions from rand_distr
+pub use rand_distr::Bernoulli;
+pub use rand_distr::Normal;
 
 /// Marker trait for continuous distributions.
 pub trait ContinuousDistribution {}
@@ -108,12 +115,13 @@ impl DiscreteDistribution for rand_distr::Bernoulli {}
 impl UnivariateDistribution for rand_distr::Bernoulli {}
 
 impl DiscreteUnivariateDistribution<f64, bool, 1> for rand_distr::Bernoulli {
+    #[inline]
     fn logpmf(params: &[f64; 1], x: bool) -> f64 {
         let p = params[0];
         if x {
             p.ln()
         } else {
-            (-p).ln_1p()
+            (1.0 - p).ln()
         }
     }
 
@@ -140,5 +148,53 @@ impl Samplable<bool> for rand_distr::Bernoulli {
         R: Rng + ?Sized,
     {
         rand_distr::Distribution::<bool>::sample(self, rng)
+    }
+}
+
+impl DiscreteDistribution for BernoulliLogit {}
+impl UnivariateDistribution for BernoulliLogit {}
+
+impl DiscreteUnivariateDistribution<f64, bool, 1> for BernoulliLogit {
+    #[inline]
+    fn logpmf(params: &[f64; 1], x: bool) -> f64 {
+        let p_logit = params[0];
+
+        // np.log(
+        // (np.exp(p_logit) / (np.exp(p_logit) + 1))
+        // **(1 - y) * (1 / (np.exp(p_logit) + 1))**y)
+        let y = if x { 1.0 } else { 0.0 };
+
+        let p_logit_exp = p_logit.exp();
+        ((p_logit_exp / (p_logit_exp + 1.0)).powf(1.0 - y) * (1.0 / (p_logit_exp + 1.0)).powf(y))
+            .ln()
+    }
+
+    fn support(&self) -> (f64, f64) {
+        (0.0, 1.0)
+    }
+
+    fn params(&self) -> [f64; 1] {
+        [self.p()]
+    }
+
+    fn loc(&self) -> Option<f64> {
+        None
+    }
+
+    fn scale(&self) -> Option<f64> {
+        None
+    }
+}
+
+impl Samplable<bool> for BernoulliLogit {
+    #[inline]
+    fn sample<R>(&self, rng: &mut R) -> bool
+    where
+        R: Rng + ?Sized,
+    {
+        let p = self.p();
+        let u = rng.gen::<f64>();
+        let logit_p = p.ln() - (-p).ln_1p();
+        u < logit_p.exp() / (1.0 + logit_p.exp())
     }
 }

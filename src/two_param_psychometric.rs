@@ -1,9 +1,13 @@
+use crate::dists::{BernoulliLogit, Normal};
+use crate::model::ArrayBaseN;
 use crate::{
     dists::{ContinuousUnivariateDistribution, DiscreteUnivariateDistribution, Samplable},
     model::PsychometricModel,
 };
+use ndarray::Data;
+use numpy::{IntoPyArray, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::prelude::*;
-use rand_distr::{Bernoulli, Normal};
+use rand_distr::Bernoulli;
 
 /** A two-parameter psychometric model. The model is defined as:
 
@@ -36,8 +40,53 @@ impl TwoParameterPsychometricModel {
 #[pymethods]
 impl TwoParameterPsychometricModel {
     #[new]
-    pub fn new_py(mu_k: f64, sigma_k: f64, mu_m: f64, sigma_m: f64) -> Self {
+    pub fn py_new(mu_k: f64, sigma_k: f64, mu_m: f64, sigma_m: f64) -> Self {
         Self::new(mu_k, sigma_k, mu_m, sigma_m)
+    }
+
+    #[pyo3(name = "sample_prior")]
+    pub fn py_sample_prior(&self) -> PyResult<Vec<f64>> {
+        let mut rng = rand::thread_rng();
+        let samples = self.sample_prior(&mut rng);
+        Ok(samples)
+    }
+
+    #[pyo3(name = "sample_prior_predictive")]
+    pub fn py_sample_prior_predictive<'py>(
+        &self,
+        py: Python<'py>,
+        design: PyReadonlyArray1<'py, f64>,
+    ) -> Vec<bool> {
+        let mut rng = rand::thread_rng();
+        let design = design.as_array();
+
+        self.sample_prior_predictive(&mut rng, &design.view())
+    }
+
+    #[pyo3(name = "log_likelihood")]
+    pub fn py_log_likelihood(
+        &self,
+        params: Vec<f64>,
+        design: PyReadonlyArray2<f64>,
+        observations: PyReadonlyArray1<bool>,
+    ) -> f64 {
+        let design = design.as_array();
+        let observations = observations.as_array();
+
+        self.log_likelihood_vec(&params, &design.view(), &observations.view())
+    }
+
+    #[pyo3(name = "log_posterior")]
+    pub fn py_log_posterior(
+        &self,
+        params: Vec<f64>,
+        design: PyReadonlyArray2<f64>,
+        observations: PyReadonlyArray1<bool>,
+    ) -> f64 {
+        let design = design.as_array();
+        let observations = observations.as_array();
+
+        self.log_posterior_vec(&params, &design.view(), &observations.view())
     }
 
     pub fn __str__(&self) -> PyResult<String> {
@@ -46,6 +95,12 @@ impl TwoParameterPsychometricModel {
 }
 
 impl PsychometricModel for TwoParameterPsychometricModel {
+
+    // The parameters
+    fn param_names(&self) -> Vec<&str> {
+        vec!["k", "m"]
+    }
+
     // The Priors
 
     fn log_prior(&self, params: &[f64]) -> f64 {
@@ -62,16 +117,9 @@ impl PsychometricModel for TwoParameterPsychometricModel {
     // The Likelihood
 
     #[allow(non_snake_case)]
-    fn log_likelihood(&self, params: &[f64], design: &[f64], observations: f64) -> f64 {
-        let k = params[0];
-        let m = params[1];
-
-        let x = design[0];
-        let y = observations;
-
-        let p = 1.0 / (1.0 + (-k * (m - x)).exp());
-
-        Bernoulli::logpmf(&[p], y == 1.0)
+    fn log_likelihood(&self, params: &[f64], design: &[f64], observation: bool) -> f64 {
+        let p_logit = params[0] * (params[1] - design[0]); // a * (b - x)
+        BernoulliLogit::logpmf(&[p_logit], observation)
     }
 
     #[allow(non_snake_case)]
@@ -80,34 +128,30 @@ impl PsychometricModel for TwoParameterPsychometricModel {
         params: &[f64],
         grad: &mut [f64],
         design: &[f64],
-        observations: f64,
+        observation: bool,
     ) -> f64 {
+
         let k = params[0];
         let m = params[1];
-
         let x = design[0];
-        let y = observations;
+        let y = if observation { 0.0 } else { 1.0 };
 
-        let grad_k = (-m * (k * m).exp() * (y)
-            - m * (k * x * (y)
-                + m * (k * x).exp()
-                + (k * m).exp() * x * (y)
-                + (k * x).exp() * x * (y)
-                - (k * x).exp() * x)
-                .exp())
+
+        // (m - x)*(y + (y - 1)*exp(k*(m - x)))/(exp(k*(m - x)) + 1)
+        grad[0] += (m - x) * (y + (y - 1.0) * (k * (m - x)).exp())
+            / ((k * (m - x)).exp() + 1.0);
+
+        // k*(y*exp(k*m) + y*exp(k*x) - exp(k*m))/(exp(k*m) + exp(k*x))
+        grad[1] += k * (y * (k * m).exp() + y * (k * x).exp() - (k * m).exp())
             / ((k * m).exp() + (k * x).exp());
-        let y = y;
-        let grad_m = k * (-(-k * m).exp() * y - (-k * x).exp() * y + (-k * x).exp())
-            / ((-k * m).exp() + (-k * x).exp());
 
-        grad[0] += grad_k;
-        grad[1] += grad_m;
+        // return the log likelihood
+        self.log_likelihood(params, design, observation)
 
-        self.log_likelihood(params, design, observations)
     }
 
     // The Posterior
-    fn log_posterior(&self, params: &[f64], design: &[f64], observations: f64) -> f64 {
+    fn log_posterior(&self, params: &[f64], design: &[f64], observations: bool) -> f64 {
         self.log_prior(params) + self.log_likelihood(params, design, observations)
     }
 
@@ -116,12 +160,12 @@ impl PsychometricModel for TwoParameterPsychometricModel {
         params: &[f64],
         grad: &mut [f64],
         design: &[f64],
-        observations: f64,
+        observations: bool,
     ) -> f64 {
-        let log_prior_grad = self.log_prior_with_grad(params, grad);
-        let log_likelihood_grad = self.log_likelihood_with_grad(params, grad, design, observations);
+        let log_prior = self.log_prior_with_grad(params, grad);
+        let log_likelihood = self.log_likelihood_with_grad(params, grad, design, observations);
 
-        log_prior_grad + log_likelihood_grad
+        log_likelihood + log_prior
     }
 
     fn n_params(&self) -> usize {
@@ -131,10 +175,22 @@ impl PsychometricModel for TwoParameterPsychometricModel {
     fn sample_prior<R: rand::Rng>(&self, rng: &mut R) -> Vec<f64> {
         vec![self.k_prior.sample(rng), self.m_prior.sample(rng)]
     }
-}
 
-impl Samplable<[f64; 2]> for TwoParameterPsychometricModel {
-    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> [f64; 2] {
-        [self.k_prior.sample(rng), self.m_prior.sample(rng)]
+    fn sample_likelihood<R: rand::Rng, S: ndarray::Data<Elem = f64>>(
+        &self,
+        rng: &mut R,
+        params: &[f64],
+        design: &crate::model::ArrayBase1<S>,
+    ) -> Vec<bool> {
+        let k = params[0];
+        let m = params[1];
+
+        let x = design[0];
+
+        let p_logit = k * (x - m);
+
+        let dist = BernoulliLogit::new(p_logit);
+
+        vec![dist.sample(rng)]
     }
 }

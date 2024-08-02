@@ -14,6 +14,7 @@ pub trait ExpectedInformationGainEstimator {
     fn estimate(
         &self,
         model: &impl PsychometricModel,
+        params: Vec<&str>,
         candidate_designs: ArrayView2<f64>,
     ) -> Array1<f64>;
 }
@@ -32,13 +33,13 @@ pub struct NestedMonteCarloEstimator {}
 /// μ̂_N := Σ_{y ∈ 𝒴} (1/N) Σ_{n=1}^N p(y | θ_n, ξ) log p(y | θ_n, ξ) - p̂(y | ξ) log p̂(y | ξ)
 /// with p̂(y | ξ) = (1/N) Σ_{n=1}^N p(y | θ_n, ξ)
 pub struct EnumeratedMonteCarloEstimator {
-    outcomes: Vec<f64>,
+    outcomes: Vec<bool>,
     n_samples: usize,
 }
 
 impl EnumeratedMonteCarloEstimator {
     /// Create a new EnumrMonte Carlo estimator.
-    pub fn new(outcomes: Vec<f64>, n_samples: usize) -> Self {
+    pub fn new(outcomes: Vec<bool>, n_samples: usize) -> Self {
         Self {
             outcomes,
             n_samples,
@@ -51,6 +52,7 @@ impl ExpectedInformationGainEstimator for EnumeratedMonteCarloEstimator {
     fn estimate(
         &self,
         model: &impl PsychometricModel,
+        _params: Vec<&str>,
         candidate_designs: ArrayView2<f64>,
     ) -> Array1<f64> {
         let mut A = Array3::<f64>::zeros((
@@ -114,7 +116,7 @@ impl ExpectedInformationGainEstimator for EnumeratedMonteCarloEstimator {
 #[pymethods]
 impl EnumeratedMonteCarloEstimator {
     #[new]
-    pub fn py_new(outcomes: Vec<f64>, n_samples: usize) -> Self {
+    pub fn py_new(outcomes: Vec<bool>, n_samples: usize) -> Self {
         EnumeratedMonteCarloEstimator::new(outcomes, n_samples)
     }
 
@@ -123,11 +125,13 @@ impl EnumeratedMonteCarloEstimator {
         &self,
         py: Python<'py>,
         model: &Bound<'py, PyAny>,
+        params: Vec<String>,
         candidate_designs: PyReadonlyArray2<'py, f64>,
     ) -> Bound<'py, PyArray1<f64>> {
         let model = try_extract_model(model).expect("Invalid model");
         let candidate_designs = candidate_designs.as_array();
-        let eig = self.estimate(&model, candidate_designs);
+        let params = params.iter().map(|x| x.as_str()).collect();
+        let eig = self.estimate(&model, params, candidate_designs);
         eig.into_pyarray_bound(py).to_owned()
     }
 }
