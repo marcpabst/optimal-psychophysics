@@ -1,6 +1,8 @@
 #[allow(dead_code)]
 use ndarray::ArrayBase;
 use ndarray::Data;
+use ndarray::Dim;
+use ndarray as nd;
 use numpy::ndarray::Array1;
 use numpy::ndarray::Array2;
 use nuts_rs::CpuLogpFunc;
@@ -38,6 +40,7 @@ pub trait PsychometricModel: Send + Sync + Clone + 'static {
 
     /// Compute the log likelihood of the model given the parameters, the design and an observation.
     fn log_likelihood(&self, params: &[f64], design: &[f64], observation: bool) -> f64;
+
 
     /// Vectorized version of the log likelihood.
     fn log_likelihood_vec<S: Data<Elem = f64>, T: Data<Elem = bool>>(
