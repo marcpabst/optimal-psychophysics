@@ -5,7 +5,6 @@ use rand::Rng;
 mod bernoulli_logit;
 
 // re-export distributions from rand_distr
-pub use rand_distr::Bernoulli;
 pub use rand_distr::Normal;
 
 /// Marker trait for continuous distributions.
@@ -130,7 +129,7 @@ impl DiscreteUnivariateDistribution<f64, bool, 1> for rand_distr::Bernoulli {
     }
 
     fn params(&self) -> [f64; 1] {
-        [self.p()]
+        [self.logit_p()]
     }
 
     fn loc(&self) -> Option<f64> {
@@ -174,7 +173,7 @@ impl DiscreteUnivariateDistribution<f64, bool, 1> for BernoulliLogit {
     }
 
     fn params(&self) -> [f64; 1] {
-        [self.p()]
+        [self.logit_p()]
     }
 
     fn loc(&self) -> Option<f64> {
@@ -192,7 +191,8 @@ impl Samplable<bool> for BernoulliLogit {
     where
         R: Rng + ?Sized,
     {
-        let p = self.p();
+        let logit_p = self.logit_p();
+        let p = logit_p.exp() / (1.0 + logit_p.exp());
         let u = rng.gen::<f64>();
         let logit_p = p.ln() - (-p).ln_1p();
         u < logit_p.exp() / (1.0 + logit_p.exp())
