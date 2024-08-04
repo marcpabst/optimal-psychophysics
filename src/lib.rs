@@ -1,5 +1,3 @@
-#![feature(autodiff)]
-
 mod dists;
 mod eig;
 mod model;

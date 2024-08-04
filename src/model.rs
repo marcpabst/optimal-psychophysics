@@ -1,8 +1,8 @@
+use ndarray as nd;
 #[allow(dead_code)]
 use ndarray::ArrayBase;
 use ndarray::Data;
 use ndarray::Dim;
-use ndarray as nd;
 use numpy::ndarray::Array1;
 use numpy::ndarray::Array2;
 use nuts_rs::CpuLogpFunc;
@@ -11,10 +11,8 @@ use nuts_rs::LogpError;
 use rand::Rng;
 use thiserror::Error;
 
-pub type ArrayBase1<S: Data> = ArrayBase<S, ndarray::Ix1>;
-pub type ArrayBase2<S: Data> = ArrayBase<S, ndarray::Ix2>;
-pub type ArrayBase3<S: Data> = ArrayBase<S, ndarray::Ix3>;
-pub type ArrayBaseN<S: Data, D: ndarray::Dimension + ndarray::RemoveAxis + Copy> = ArrayBase<S, D>;
+pub type ArrayBase1<S> = ArrayBase<S, ndarray::Ix1>;
+pub type ArrayBase2<S> = ArrayBase<S, ndarray::Ix2>;
 
 // The density might fail in a recoverable or non-recoverable manner...
 #[derive(Debug, Error)]
@@ -40,7 +38,6 @@ pub trait PsychometricModel: Send + Sync + Clone + 'static {
 
     /// Compute the log likelihood of the model given the parameters, the design and an observation.
     fn log_likelihood(&self, params: &[f64], design: &[f64], observation: bool) -> f64;
-
 
     /// Vectorized version of the log likelihood.
     fn log_likelihood_vec<S: Data<Elem = f64>, T: Data<Elem = bool>>(
@@ -117,7 +114,6 @@ pub trait PsychometricModel: Send + Sync + Clone + 'static {
         design: &[f64],
         observations: bool,
     ) -> f64 {
-
         let log_likelihood_grad = self.log_likelihood_with_grad(params, grad, design, observations);
         let log_prior_grad = self.log_prior_with_grad(params, grad);
 
@@ -133,8 +129,6 @@ pub trait PsychometricModel: Send + Sync + Clone + 'static {
         design: &ArrayBase2<S>,
         observations: &ArrayBase1<T>,
     ) -> f64 {
-
-
         let log_prior_grad = self.log_prior_with_grad(params, grad);
         let log_likelihood_grad =
             self.log_likelihood_with_grad_vec(params, grad, design, observations);
@@ -210,12 +204,9 @@ impl<M: PsychometricModel> CpuLogpFunc for PsychometricModelWithData<M> {
         // zero out the gradient
         grad.iter_mut().for_each(|x| *x = 0.0);
 
-        Ok(self.model.log_posterior_with_grad_vec(
-            position,
-            grad,
-            &self.design,
-            &self.observations,
-        ))
+        Ok(self
+            .model
+            .log_posterior_with_grad_vec(position, grad, &self.design, &self.observations))
     }
 }
 

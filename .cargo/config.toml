@@ -1,2 +1,2 @@
 [build]
-rustflags = ["-Z", "unstable-options"]
+# rustflags = ["-Z", "unstable-options"]

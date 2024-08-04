@@ -14,7 +14,7 @@ This package provides a Rust implementation of different ways to obtain  estimat
 
 # (Planned) Features
 - [ ] Posterior estimation
-  - [x] using Hamiltonian Monte Carlo (HMC) using no-U-turn sampling (using the `nuts-rs` crate)
+  - [x] using Hamiltonian Monte Carlo (HMC) using no-U-turn sampling (using the [`nuts-rs`](https://docs.rs/nuts-rs/latest/nuts_rs/) crate)
   - [ ] using grid approximation
   - [ ] using Variational Inference methods (maybe)
 - [ ] Expected Information Gain (EIG) calculations
@@ -27,7 +27,8 @@ This package provides a Rust implementation of different ways to obtain  estimat
 # Short-term roadmap
 - [ ] Make the base psychometric model more flexible (e.g., allow for different link functions, prior distributions, snd multivariate outcomes/designs)
 - [ ] Allow better vectorisation using `ndarray` (will mainly be helpful when calling from Python with `pyo3`)
-- [ ] Implement support for Arviz for posterior diagnostics on the Python side
+- [ ] Implement support for [Arviz](https://python.arviz.org/en/stable/) for posterior diagnostics on the Python side
+- [ ] Use [Enyme](https://github.com/EnzymeAD/rust) instead of manually deriving gradients (this currently requires building the Rust compiler from source)
 
 
 # Glossary

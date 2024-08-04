@@ -1,5 +1,4 @@
 use crate::dists::{BernoulliLogit, Normal};
-use crate::model::ArrayBaseN;
 use crate::{
     dists::{ContinuousUnivariateDistribution, DiscreteUnivariateDistribution, Samplable},
     model::PsychometricModel,
@@ -95,7 +94,6 @@ impl TwoParameterPsychometricModel {
 }
 
 impl PsychometricModel for TwoParameterPsychometricModel {
-
     // The parameters
     fn param_names(&self) -> Vec<&str> {
         vec!["k", "m"]
@@ -130,16 +128,13 @@ impl PsychometricModel for TwoParameterPsychometricModel {
         design: &[f64],
         observation: bool,
     ) -> f64 {
-
         let k = params[0];
         let m = params[1];
         let x = design[0];
         let y = if observation { 0.0 } else { 1.0 };
 
-
         // (m - x)*(y + (y - 1)*exp(k*(m - x)))/(exp(k*(m - x)) + 1)
-        grad[0] += (m - x) * (y + (y - 1.0) * (k * (m - x)).exp())
-            / ((k * (m - x)).exp() + 1.0);
+        grad[0] += (m - x) * (y + (y - 1.0) * (k * (m - x)).exp()) / ((k * (m - x)).exp() + 1.0);
 
         // k*(y*exp(k*m) + y*exp(k*x) - exp(k*m))/(exp(k*m) + exp(k*x))
         grad[1] += k * (y * (k * m).exp() + y * (k * x).exp() - (k * m).exp())
@@ -147,7 +142,6 @@ impl PsychometricModel for TwoParameterPsychometricModel {
 
         // return the log likelihood
         self.log_likelihood(params, design, observation)
-
     }
 
     // The Posterior
