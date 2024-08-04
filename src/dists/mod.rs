@@ -129,7 +129,7 @@ impl DiscreteUnivariateDistribution<f64, bool, 1> for rand_distr::Bernoulli {
     }
 
     fn params(&self) -> [f64; 1] {
-        [self.logit_p()]
+        todo!()
     }
 
     fn loc(&self) -> Option<f64> {
